@@ -1,6 +1,6 @@
 {
     'name': 'AFIP/ARCA WebService Monitor',
-    'version': '18.0.1.1.3',
+    'version': '19.0.1.1.4',
     'category': 'Accounting/Localizations',
     'summary': 'Monitor AFIP/ARCA WebService availability and block invoice confirmation when service is down',
     'description': """
