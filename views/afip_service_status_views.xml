@@ -84,9 +84,7 @@
                                     </strong>
                                 </div>
                                 <span class="float-end">
-                                    <field name="is_available" widget="badge" 
-                                           decoration-success="is_available" 
-                                           decoration-danger="not is_available"/>
+                                    <t t-if="record.is_available.raw_value"><span class="badge text-bg-success"><i class="fa fa-check-circle"/> Online</span></t><t t-else=""><span class="badge text-bg-danger"><i class="fa fa-times-circle"/> Offline</span></t>
                                 </span>
                             </div>
                             <div class="o_kanban_record_body">
