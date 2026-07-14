@@ -72,17 +72,48 @@ class AccountMove(models.Model):
                 </div>
             '''
 
-    def _check_afip_service_before_post(self):
-        """Check AFIP service availability before posting"""
+    def _l10n_ar_caea_fallback_ready(self):
+        """True si la emisión puede continuar aunque AFIP esté caído
+        porque hay contingencia CAEA disponible (módulo `l10n_ar_caea`).
+
+        Guardas con getattr/env-check: este módulo NO depende de
+        l10n_ar_caea — si no está instalado, todo devuelve False y el
+        comportamiento clásico (bloquear) se mantiene.
+        """
         self.ensure_one()
-        
+        # El diario ES un PV exclusivo CAEA → nunca necesita AFIP online.
+        if getattr(self.journal_id, 'l10n_ar_afip_pos_caea', False):
+            return True
+        if 'l10n_ar.caea' not in self.env:
+            return False
+        if not getattr(self.company_id, 'l10n_ar_caea_enabled', False):
+            return False
+        if not getattr(self.journal_id, 'l10n_ar_caea_journal_id', False):
+            return False
+        caea = self.env['l10n_ar.caea'].find_active(self.company_id)
+        return bool(caea)
+
+    def _check_afip_service_before_post(self):
+        """Check AFIP service availability before posting.
+
+        Con CAEA disponible NO bloqueamos: señalizamos y dejamos que
+        `l10n_ar_caea` re-rutee el comprobante al PV de contingencia
+        (RG 5785/2025). Bloquear solo queda para el caso sin salida
+        legal: AFIP caído y sin CAEA vigente.
+        """
+        self.ensure_one()
+
         # Get configuration
         block_on_failure = self.env['ir.config_parameter'].sudo().get_param(
             'afip_webservice_monitor.block_on_failure', default='True')
-        
+
         if block_on_failure == 'False':
             return True
-        
+
+        # Diario PV exclusivo CAEA: emite offline por diseño, sin check.
+        if getattr(self.journal_id, 'l10n_ar_afip_pos_caea', False):
+            return True
+
         if self.requires_afip_check:
             AfipStatus = self.env['afip.service.status'].sudo()
             
@@ -100,13 +131,22 @@ class AccountMove(models.Model):
                 service.check_service_status()
                 
                 if not service.is_available:
+                    # Contingencia CAEA disponible → señalizar y seguir.
+                    # l10n_ar_caea re-rutea el comprobante al PV CAEA.
+                    if self._l10n_ar_caea_fallback_ready():
+                        _logger.info(
+                            "AFIP caído pero hay CAEA vigente — %s sigue "
+                            "en modo contingencia (RG 5785/2025).", self.name,
+                        )
+                        return True
+
                     # Log detailed error for admin/debugging
                     _logger.warning(
                         f"Blocked invoice confirmation for {self.name} - "
                         f"AFIP service unavailable. Service: {service.name}, "
                         f"Error: {service.error_message}"
                     )
-                    
+
                     # Show simple user-friendly message
                     raise UserError(_(
                         'AFIP/ARCA Web Service is currently unavailable.\n'
