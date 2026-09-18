@@ -1,6 +1,6 @@
 {
     'name': 'AFIP/ARCA WebService Monitor',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'category': 'Accounting/Localizations',
     'summary': 'Monitor AFIP/ARCA WebService availability and block invoice confirmation when service is down (or hand over to CAEA contingency)',
     'description': """
@@ -11,6 +11,7 @@
         * Blocks invoice confirmation for Argentinian POS journals when service is unavailable
         * Automatic periodic checks
         * Manual refresh option
+        * Silent on neutralized databases (staging/test): no checks, no banner, no blocking
     """,
     'author': 'Trixocom',
     'website': 'https://trixocom.com',

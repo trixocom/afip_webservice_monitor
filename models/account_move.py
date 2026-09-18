@@ -103,6 +103,10 @@ class AccountMove(models.Model):
         """
         self.ensure_one()
 
+        # Base neutralizada (staging/test): nunca bloquear.
+        if self.env['afip.service.status'].sudo()._is_neutralized():
+            return True
+
         # Get configuration
         block_on_failure = self.env['ir.config_parameter'].sudo().get_param(
             'afip_webservice_monitor.block_on_failure', default='True')

@@ -63,6 +63,12 @@ export class AfipStatusBanner extends Component {
                 []
             );
 
+            // Base neutralizada (staging/test): sin banner.
+            if (statusInfo && statusInfo.neutralized) {
+                this.state.visible = false;
+                return;
+            }
+
             this.state.wsfeAvailable = statusInfo.wsfe?.available ?? true;
             this.state.wsaaAvailable = statusInfo.wsaa?.available ?? true;
             this.state.lastCheck = statusInfo.wsfe?.check_date || null;

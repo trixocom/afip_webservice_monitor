@@ -253,8 +253,22 @@ class AfipServiceStatus(models.Model):
         return result
 
     @api.model
+    def _is_neutralized(self):
+        """True en una base neutralizada (staging/test: `odoo neutralize`).
+
+        En esas bases no tiene sentido monitorear AFIP ni bloquear/avisar:
+        no se factura de verdad y el banner rojo confunde al usuario.
+        """
+        value = self.env['ir.config_parameter'].sudo().get_param(
+            'database.is_neutralized', default='')
+        return str(value).strip().lower() in ('true', '1', 't', 'yes')
+
+    @api.model
     def cron_check_all_services(self):
         """Cron job to check all active services"""
+        if self._is_neutralized():
+            _logger.debug('AFIP monitor: base neutralizada, no se chequean servicios')
+            return
         services = self.search([('active', '=', True)])
         for service in services:
             try:
@@ -290,6 +304,8 @@ class AfipServiceStatus(models.Model):
     @api.model
     def is_afip_available(self, service_type='wsfe'):
         """Check if AFIP service is available for invoice operations"""
+        if self._is_neutralized():
+            return True
         environment = self.env['ir.config_parameter'].sudo().get_param(
             'afip_webservice_monitor.environment', default='production')
         
@@ -322,6 +338,8 @@ class AfipServiceStatus(models.Model):
     @api.model
     def get_status_info(self):
         """Get status information for all services"""
+        if self._is_neutralized():
+            return {'wsfe': None, 'wsaa': None, 'all_available': True, 'neutralized': True}
         environment = self.env['ir.config_parameter'].sudo().get_param(
             'afip_webservice_monitor.environment', default='production')
         

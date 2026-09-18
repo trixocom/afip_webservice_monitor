@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [19.0.1.3.0] - 2026-09-18
+
+### Changed
+- Bases **neutralizadas** (staging/test, `odoo neutralize` → parámetro
+  `database.is_neutralized`): el monitor queda en silencio. El cron no
+  consulta AFIP, `is_afip_available()` responde disponible,
+  `get_status_info()` devuelve `neutralized: true` y el banner rojo no se
+  muestra; `action_post` nunca bloquea. Motivo: en toda copia neutralizada
+  aparecía el cartel "SERVICIO WEB DE AFIP/ARCA NO DISPONIBLE" con la
+  última verificación de producción, confundiendo a los usuarios de prueba.
+- Nuevo `data/neutralize.sql` (lo ejecuta `odoo neutralize`): desactiva el
+  cron del módulo y apaga `afip_webservice_monitor.show_banner`. Refuerzo
+  del chequeo en runtime, que cubre también las copias ya neutralizadas.
+
 ## [19.0.1.2.0] - 2026-07-13
 
 ### Changed
