@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [19.0.1.4.0] - 2026-11-18
+
+### Changed
+- El chequeo previo a publicar ya no consulta a ARCA por cada factura: si el
+  último chequeo dio disponible hace menos de
+  `afip_webservice_monitor.post_check_ttl` segundos (60 por defecto) se
+  reutiliza. Un resultado caído o viejo se vuelve a consultar. Con el
+  parámetro en 0 vuelve el comportamiento anterior.
+- Para WSFE, `FEDummy` se manda con un POST directo, sin zeep y sin bajar el
+  WSDL: una conexión por chequeo en vez de dos. Si la respuesta no se puede
+  interpretar, se usa el chequeo con zeep como antes.
+- Medido en producción: el chequeo se llevaba el 97 % del tiempo de publicar
+  (unos 1,6 s por factura).
+
 ## [19.0.1.3.0] - 2026-09-18
 
 ### Changed

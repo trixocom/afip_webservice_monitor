@@ -132,7 +132,14 @@ class AccountMove(models.Model):
             ], limit=1)
             
             if service:
-                service.check_service_status()
+                # Antes se forzaba un chequeo en vivo por cada factura (~1,6 s
+                # c/u: bajar el WSDL + FEDummy). Si el último chequeo dio
+                # disponible hace menos de `post_check_ttl` segundos se
+                # reutiliza; un resultado caído o viejo se vuelve a consultar.
+                ttl = int(self.env['ir.config_parameter'].sudo().get_param(
+                    'afip_webservice_monitor.post_check_ttl', default=60) or 0)
+                if not service._is_recent_ok(ttl):
+                    service.check_service_status()
                 
                 if not service.is_available:
                     # Contingencia CAEA disponible → señalizar y seguir.

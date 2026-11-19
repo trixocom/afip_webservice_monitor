@@ -6,6 +6,8 @@ import ssl
 import os
 from datetime import datetime, timedelta
 
+from ..lib import fedummy
+
 _logger = logging.getLogger(__name__)
 
 # Configure SSL at module level to allow weaker DH keys for AFIP
@@ -218,6 +220,66 @@ class AfipServiceStatus(models.Model):
                 'error': f'Error: {str(e)}'
             }
 
+    @api.model
+    def _check_wsfe_dummy_direct(self, url, timeout=10):
+        """FEDummy con un POST directo, sin zeep: una sola conexión por chequeo.
+
+        zeep baja el WSDL cada vez que se arma un `Client`, así que el chequeo
+        anterior costaba dos conexiones TLS. Devuelve el mismo dict que
+        `_check_service_with_zeep`, o None si la respuesta no se pudo
+        interpretar (el llamador cae al chequeo con zeep, como antes).
+        """
+        import time
+        start_time = time.time()
+        try:
+            status_code, content = fedummy.call(create_ssl_session(), url, timeout)
+        except requests.exceptions.Timeout:
+            return {
+                'available': False,
+                'status_code': 0,
+                'response_time': timeout,
+                'error': f'Timeout after {timeout} seconds',
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                'available': False,
+                'status_code': 0,
+                'response_time': 0,
+                'error': f'Connection Error: {str(e)}',
+            }
+        servers = fedummy.parse_response(content) if status_code == 200 else None
+        if servers is None:
+            _logger.info(
+                "AFIP FEDummy directo: respuesta no interpretable (HTTP %s), "
+                "sigo con el chequeo por zeep.", status_code,
+            )
+            return None
+        if fedummy.is_ok(servers):
+            return {
+                'available': True,
+                'status_code': 200,
+                'response_time': time.time() - start_time,
+                'error': False,
+            }
+        return {
+            'available': False,
+            'status_code': 200,
+            'response_time': 0,
+            'error': "AFIP Error: App=%s, Db=%s, Auth=%s" % servers,
+        }
+
+    def _is_recent_ok(self, ttl_seconds):
+        """True si el último chequeo dio disponible hace menos de `ttl_seconds`.
+
+        Solo se reutiliza un resultado POSITIVO reciente. Si el último chequeo
+        dio caído, o es viejo, hay que volver a consultar: así el bloqueo y
+        la contingencia siguen reaccionando igual que antes ante una caída.
+        """
+        self.ensure_one()
+        if ttl_seconds <= 0 or not self.is_available or not self.check_date:
+            return False
+        return (fields.Datetime.now() - self.check_date) <= timedelta(seconds=ttl_seconds)
+
     def check_service_status(self):
         """Check the status of the AFIP service"""
         self.ensure_one()
@@ -227,7 +289,11 @@ class AfipServiceStatus(models.Model):
         
         # Try with zeep first, fallback to requests
         try:
-            result = self._check_service_with_zeep(self.url, self.service_type, timeout)
+            result = None
+            if self.service_type == 'wsfe':
+                result = self._check_wsfe_dummy_direct(self.url, timeout)
+            if result is None:
+                result = self._check_service_with_zeep(self.url, self.service_type, timeout)
         except Exception as e:
             _logger.warning(f"Zeep check failed, falling back to requests: {e}")
             result = self._check_service_with_requests(self.url, timeout)
